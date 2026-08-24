@@ -659,56 +659,201 @@ Código:
 
 ![image](https://github.com/user-attachments/assets/f9dff8e7-1721-47ea-8e66-75e566b14ad8)
 
-![image]()
+Hacemos una nueva consulta.
 
-![image]()
+Código:
 
-![image]()
+       WITH sales AS
+       (
+           SELECT
+               sales_id,
+               product_sk,
+               customer_sk,
+               {{ multiply('unit_price', 'quantity')}} as calculated_gross_amount,
+               gross_amount,
+               payment_method
+           FROM
+               {{ ref('bronze_sales') }}
 
-![image]()
+       ),
 
-![image]()
+       products AS
+       (
+           SELECT 
+               product_sk,
+               category
+           FROM 
+               {{ ref('bronze_product') }} 
+       ),
 
-![image]()
+       customer AS 
+       (
+           SELECT
+               customer_sk,
+               gender
+           FROM
+               {{ ref('bronze_customer') }}
+       )
 
-![image]()
+       joined_query AS (
+       SELECT
+           sales.sales_id,
+           sales.gross_amount,
+           sales.payment_method,
+           products.category,
+           customer.gender
+       FROM
+           sales
+       JOIN
+           products ON sales.product_sk = products.product_sk
+       JOIN
+           customer ON sales.customer_sk = customer.customer_sk
+       )
 
-![image]()
+       SELECT
+           category,
+           gender,
+           sum(gross_amount) as total_sales
+       FROM
+           joined_query
+       GROUP BY
+           category,
+           gender
+       ORDER BY
+            total_sales DESC
 
-![image]()
 
-![image]()
+![image](https://github.com/user-attachments/assets/6152b324-32fb-4c46-aec3-5f2ea86b5f8f)
 
-![image]()
+Nos dirigimos ahora a la terminal y, ejecutamos el siguiente código.
 
-![image]()
+Código:
 
-![image]()
+       dbt run --select "model/silver"
 
-![image]()
+![image](https://github.com/user-attachments/assets/0d4ffa46-56ad-4b3e-b86c-53a47db4f19e)
 
-![image]()
+![image](https://github.com/user-attachments/assets/db8fc564-b146-4357-a7d1-9cfa063b807c)
 
-![image]()
+En Databricks entramos workspace DBT  y creamos un query
 
-![image]()
+Código:
 
-![image]()
+       CREATE TABLE items
+       (
+           id INT,
+           name STRING,
+           category STRING,
+           updated TIMESTAMP
 
-![image]()
+       );
 
-![image]()
+       INSERT INTO items
+       VALUES
+       (1, 'item1', 'category1', current_timestamp()),
+       (2, 'item2', 'category2', current_timestamp()),
+       (3, 'item3', 'category3', current_timestamp());
 
-![image]()
+![image](https://github.com/user-attachments/assets/3fce0fab-7ca8-450b-bf00-17b2aca4a3ac)
 
-![image]()
+Ahora, en la carpeta snapshots crearemos un archivo llamado gold_items.yml
 
-![image]()
+![image](https://github.com/user-attachments/assets/6a304654-7fb5-430a-8dfd-f2614f9f6f96)
 
-![image]()
+Previo a ello, en la carpeta sources seleccionamos el archivo source y agregamos el name: ítems, para el proceso.
 
-![image]()
+![image](https://github.com/user-attachments/assets/34ded69c-b87e-43ec-9bce-ef61469ba7a8)
 
-![image]()
+Y también, en la carpeta models/gold creamos el archivo source_gold_items.sql
 
-![image]()
+Código:
+
+       WITH dedup_query AS
+       (
+           SELECT 
+                *,
+               ROW_NUMBER() OVER(PATITION BY id ORDER BY updateDate DESC) as deduplication_id
+           FROM
+               {{ ref('source', 'items') }}
+       )
+       SELECT
+           id,name,category,updateDate
+       FROM
+           dedup_query
+       WHERE
+           deduplication_id = 1
+
+
+
+como quedo pendiente, en el archivo sanpshots/gold_items.yml pasamos el siguiente código.
+
+Código:
+
+       snapshots:
+           -name: gold_items
+           relation: ref('source_gold_items')
+            config:
+               schema: gold
+               database: dbt_dev
+               unique_key: id
+               strategy: timestamp
+               update_at: updateDate
+               dbt_valid_to_current: "to_date('9999-12-31')"
+
+
+luego ejecutamos los siguientes códigos en la terminal.
+
+Código:
+
+       dbt snapshot
+
+
+código:
+
+      dbt build
+
+
+![image](https://github.com/user-attachments/assets/4f207457-9bbd-479b-ac9f-facdd9041965)
+
+Luego en Databricks hacemos la siguiente consulta.
+
+Código:
+
+       SELECT * FROM gold.items
+
+![image](https://github.com/user-attachments/assets/cfad6f6b-1890-49cd-b7c5-d8200f09ced5)
+
+![image](https://github.com/user-attachments/assets/52909303-6cb3-48c3-8c38-b35c56e75218)
+
+Ahora, creamos un catálogo.
+
+![image](https://github.com/user-attachments/assets/86ff9d07-3190-44d0-9a20-fab5f1c2269d)
+
+Luego, creamos el esquema.
+
+![image](https://github.com/user-attachments/assets/d9c7b802-1cfc-46bc-99b8-bcd3b02be446)
+
+Creamos las siguientes tablas.
+
+![image](https://github.com/user-attachments/assets/c338bff1-6402-4bfd-b994-19b5390ac852)
+
+![image](https://github.com/user-attachments/assets/2fed9c91-922a-46e0-8ab1-eb1dbd1c1a3e)
+
+![image](https://github.com/user-attachments/assets/bbeded8c-8776-40e3-b35c-cc4b12cd62c2)
+
+![image](https://github.com/user-attachments/assets/72547b86-4a8d-4760-875f-843f29b80ce9)
+
+![image](https://github.com/user-attachments/assets/b58b632f-c3e4-4bd7-b1f5-c691dbd115c3)
+
+![image](https://github.com/user-attachments/assets/50d63f60-9ca9-4808-a616-c27bae62898b)
+
+![image](https://github.com/user-attachments/assets/5421a774-b198-4809-b8b5-caf7d5955f9d)
+
+![image](https://github.com/user-attachments/assets/30216a74-128b-4e80-a4e1-4eed3d09a17c)
+
+![image](https://github.com/user-attachments/assets/bc2673ca-6047-484b-b1c9-eb3115ff08ec)
+
+![image](https://github.com/user-attachments/assets/ea47ec24-311a-47e7-bf31-c099ab9f6c10)
+
+
+
