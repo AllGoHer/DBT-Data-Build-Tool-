@@ -268,37 +268,396 @@ Código:
         Dbt test
 
 
-![image]()
+![image](https://github.com/user-attachments/assets/a57eca18-5fa0-403a-98a9-e054c524184a)
 
-![image]()
+Ahora, hagamos otra prueba agregando Severity, para cambiaremos un poco el código del archivo properties.yml
 
-![image]()
+Código:
 
-![image]()
+        version: 2
 
-![image]()
+        models:
 
-![image]()
+          - name: bronze_date
+            config:
+              materialized: view
+              schema: bronze
 
-![image]()
+          - name: bronze_product
+            config:
+              materialized: view
 
-![image]()
+         - name: bronze_sales
+            columns:
+              - name: sales_id
+                data_tests:
+                  - unique
+                  - not_null
 
-![image]()
+  
+          - name: bronze_store
+            columns:
+              - name: store_sk
+                data_tests:
+                  - unique
+                  - not_null
+              - name: country
+                data_tests:
+                  - accepted_values: 
+                      arguments:
+                        values: ['USA', 'Canada', 'Mexico']
+                      config:
+                        severity: warn 
 
-![image]()
 
-![image]()
 
-![image]()
+luego, ejecutamos la prueba.
 
-![image]()
+Código:
 
-![image]()
+        dbt test
 
-![image]()
 
-![image]()
+![image](https://github.com/user-attachments/assets/4fd7cfcd-9031-483f-9896-9b518f91014b)
+
+________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+### PRUEBAS SINGULARES
+
+Vamos hacer una prueba para asegurarnos que en el archivo de ventas no haya un monto negativo a excepción de la columna de descuentos.
+
+Para ello, nos dirigimos a la carpeta de test y creamos un archivo llamado non_negative_test.sql 
+
+
+![image](https://github.com/user-attachments/assets/2f0188fc-8147-4bc6-892d-d95f942fd48e)
+
+Nota: en las pruebas singulares las condicionales van en orden inverso, si devuelve algún resultado se tomará como un registro.
+
+Código:
+
+        SELECT 
+            * 
+        FROM
+            {{  ref('bronze_sales') }}
+        WHERE
+            gross_amount < 0 AND net_amount < 0
+
+
+![image](https://github.com/user-attachments/assets/2ca2b1e0-aa98-491d-9548-5f8cba822aca)
+
+Como vemos, no hay ningún tipo de registro, quiere decir que se superó la prueba.
+
+Ahora, se añadirá esta prueba, así es que, en la terminal se ejecutará nuevamente dbt test.
+
+
+![image](https://github.com/user-attachments/assets/c0925005-7d70-4086-8192-c350c1c1820a)
+
+Como podemos ver, ahora tenemos 6 data tests, uno más del anterior.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________
+
+### PRUEBA GENERICA PERSONALIZADA
+
+
+![image](https://github.com/user-attachments/assets/75f3be7f-f61a-4d3f-9459-35ddb60b0ff1)
+
+![image](https://github.com/user-attachments/assets/31640356-7f85-4ea2-b107-6d38eb88e6c5)
+
+Primero crearemos una carpeta dentro de Tests llamada generic y, dentro de ella, crearemos el archivo generic_non_negative.sql
+
+Código:
+
+        {% test generic_non_negative(model, column_name) %}
+
+        SELECT
+            *
+        FROM
+            {{ model }}
+        WHERE
+            {{ column_name }} < 0
+
+        {% endtest %}
+
+![image](https://github.com/user-attachments/assets/d9a1fb50-d5aa-441e-b7c6-fe0a7a68dbb2)
+
+Luego, vamos properties.yml y editamos el código en bronce_sales.
+
+Código:
+
+        version: 2
+
+        models:
+
+          - name: bronze_date
+            config:
+              materialized: view
+              schema: bronze
+
+          - name: bronze_product
+            config:
+              materialized: view
+
+          - name: bronze_sales
+            columns:
+              - name: sales_id
+                data_tests:
+                  - unique
+                  - not_null
+              - name: gross_amount
+                 data_tests:
+                   - generic_non_negative
+          
+  
+          - name: bronze_store
+             columns:
+              - name: store_sk
+                data_tests:
+                  - unique
+                  - not_null
+              - name: country
+                data_tests:
+                  - accepted_values: 
+                      arguments:
+                        values: ['USA', 'Canada', 'Mexico']
+                      config:
+                        severity: warn 
+
+luego, ejecutamos la prueba.
+
+Código:
+
+        dbt test
+
+![image](https://github.com/user-attachments/assets/da1aa6f9-86da-4d3c-adcf-7b9f10fe77d6)
+
+________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+### DBT SEEDS
+
+
+Ahora, en la carpeta de Seeds crearemos un archivo llamado lookup.csv con los siguientes datos.
+
+Datos:
+
+        customer_id, customer_name, customer_email
+        1, Jhon Deer, Jhond@example.com
+        2, Juan Ciervo, elvenado@example.com
+        3, Bart Simpson, bartolomeo@example.com
+
+Luego, para ejecutar ello necesitaríamos modificar el archivo dbt_project.yml para agregar el seeds al final del código.
+
+Código:
+
+        models:
+          all_GoHer_project:
+            # Config indicated by + and applies to all files under models/example/
+            bronze:
+              +materialized: table
+              schema: bronze
+            silver:
+              +materialized: table
+               schema: silver
+             gold:
+              +materialized: table
+              schema: gold
+
+        seeds: 
+          all_GoHer_project:
+            +schema: bronze
+
+Luego, para verificar ejecutaremos el siguiente código.
+
+Código:
+
+        Dbt seed
+
+
+![image](https://github.com/user-attachments/assets/e9958eb8-da58-4e7d-b351-eada679541f6)
+
+Ahora, verificamos que en el archivo lookup se haya creado en Databricks.
+
+![image](https://github.com/user-attachments/assets/e0268476-07b3-46e2-9583-09be3b998425)
+
+Si queremos hacer consultas, nos vamos a nuestra carpeta de analisis, para ello, crearemos un archivo llamado explore.sql
+
+Código:
+
+        SELECT * FROM  {{ ref('lookup') }}
+
+![image](https://github.com/user-attachments/assets/e4771b1a-f90e-4e85-ae3a-a8b60629599e)
+
+Luego, salimos de la carpeta de proyecto y ejecutamos los siguientes comandos git.
+
+Código:
+
+        cd ..
+
+código:
+
+        git add .
+
+código:
+
+        git commit -m “sedes, test, etc”
+
+![image](https://github.com/user-attachments/assets/458fe023-3901-42ce-908b-20d6ade53a8c)
+
+________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+### JINJA & MACROS
+
+
+![image](https://github.com/user-attachments/assets/90b6b8df-311d-4f57-9218-9d5d4763ec2f)
+
+En la carpeta de analisis creamos un archivo llamado jinja-1.sql.
+
+Código:
+
+        {% set var_name = "All GoHer" %}
+
+        {{ var_name }}
+
+Al compilar da lo siguiente.
+
+All GoHer
+
+Luego, creamos el archivo jinja-2.sql.
+
+Código:
+
+        {% set inc_flag = 1 %}
+        {% set last_load = 3 %}
+
+        {% set cols_list = ["sales_id", "date_sk", "gross_amount"] %}
+
+        SELECT 
+    
+            {% for i in cols_list %} 
+                {{ i }},
+                {% if not loop.last %}, {% endif %}
+            {% endfor %}
+    
+        FROM
+            {{ ref('bronze_sales') }}
+
+        {% if inc_flag == 1 %}
+
+            WHERE date_sk > {{ last_load }}
+
+        {% endif %}
+
+
+Y compilamos.
+
+Luego creamos en la carpeta macro un archivo llamado multimacro.sql.
+
+Código:
+
+        {% macro multiply(col1,col2) %}
+
+            {{ col1 }}*{{ col2 }} 
+
+        {% endmacro %}
+
+Ahora, creamos un nuevo archivo en analyses llamado query_macro.sql
+
+Código:
+
+        SELECT
+            {{ multiply(10,50) }} as test_col 
+
+_______________________________________________________________________________________________________________________________________________________________________________________________________________
+### SILVER LAYER
+
+En la carpeta silver, creamos un archivo llamado silver_salesinfo.sql.
+
+Código:
+
+        WITH sales AS
+        (
+            SELECT
+                sales_id,
+                product_sk
+                customer_sk
+                gross_amount,
+                payment_method
+            FROM
+                {{ ref('bronze_sales') }}
+
+        ),
+
+        bronze_products AS
+        (
+            SELECT 
+                product_sk,
+                category
+            FROM 
+                {{ ref('bronze_product') }} 
+        ),
+
+         customer AS 
+        (
+            SELECT
+                customer_sk,
+        
+        )
+
+Ahora, volvemos al archivo bronce y entramos al archivo bronce_customer.sql y ejecutamos.
+
+Veremos la siguiente información.
+
+![image](https://github.com/user-attachments/assets/928aabe4-51b0-4a30-b852-198f37bd8fa2)
+
+Ahora, hacemos una nueva consulta.
+
+Código:
+
+        WITH sales AS
+        (
+            SELECT
+                sales_id,
+                product_sk,
+                customer_sk,
+                {{ multiply('unit_price', 'quantity')}} as calculated_gross_amount,
+                gross_amount,
+                payment_method
+            FROM
+                {{ ref('bronze_sales') }}
+
+        ),
+
+        products AS
+        (
+            SELECT 
+                product_sk,
+                category
+            FROM 
+                {{ ref('bronze_product') }} 
+        ),
+
+        customer AS 
+        (
+            SELECT
+                customer_sk,
+                gender
+               FROM
+                {{ ref('bronze_customer') }}
+        )
+
+        SELECT
+            sales.sales_id,
+            sales.gross_amount,
+            sales.payment_method,
+            products.category,
+            customer.gender
+        FROM
+            sales
+        JOIN
+            products ON sales.product_sk = products.product_sk
+        JOIN
+            customer ON sales.customer_sk = customer.customer_sk
+
+![image](https://github.com/user-attachments/assets/f9dff8e7-1721-47ea-8e66-75e566b14ad8)
 
 ![image]()
 
